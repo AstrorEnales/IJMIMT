@@ -45,6 +45,7 @@ public final class AreaSelectionDialog extends BaseDialog implements ListSelecti
         growPixel = new JSpinner();
         growPixel.setModel(new SpinnerNumberModel());
         growPixel.setValue(0);
+
         selection = new JList();
         selection.setSelectedIndex(0);
         selection.addListSelectionListener(this);
@@ -56,11 +57,14 @@ public final class AreaSelectionDialog extends BaseDialog implements ListSelecti
         selection.setSelectionMode(ListSelectionModel.MULTIPLE_INTERVAL_SELECTION);
         selection.setListData(ids);
         selection.setSelectedIndex(0);
+        JScrollPane scrollPane = new JScrollPane(selection);
+        scrollPane.setHorizontalScrollBarPolicy(JScrollPane.HORIZONTAL_SCROLLBAR_NEVER);
+        scrollPane.setVerticalScrollBarPolicy(JScrollPane.VERTICAL_SCROLLBAR_ALWAYS);
 
         addComponent(new JLabel("Select one or more areas to be used in the montage"));
         addComponent(new JLabel("Areas:"));
         constraints.weighty = 1;
-        addComponent(selection);
+        addComponent(scrollPane);
         constraints.weighty = 0;
         constraints.gridwidth = GridBagConstraints.RELATIVE;
 

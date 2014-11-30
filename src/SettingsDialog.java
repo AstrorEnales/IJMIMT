@@ -28,6 +28,9 @@ import ij.WindowManager;
 import javax.swing.*;
 import javax.swing.event.ListSelectionEvent;
 import javax.swing.event.ListSelectionListener;
+import java.awt.*;
+import java.awt.event.ActionEvent;
+import java.awt.event.ActionListener;
 import java.util.ArrayList;
 
 public class SettingsDialog extends BaseDialog implements ListSelectionListener {
@@ -35,54 +38,113 @@ public class SettingsDialog extends BaseDialog implements ListSelectionListener 
         super("IJMIMT (1/3)");
         setSize(400, 400);
 
-        selection = new JList();
-        selection.setSelectedIndex(0);
-        selection.addListSelectionListener(this);
+        JPanel selectionPanel = new JPanel();
+        GridLayout selectionLayout = new GridLayout();
+        selectionLayout.setColumns(1);
+        selectionPanel.setLayout(selectionLayout);
+
         int[] ids = WindowManager.getIDList();
-        ArrayList<String> keys = new ArrayList<String>();
+        ArrayList<ImageSelectionPanel> panels = new ArrayList<ImageSelectionPanel>();
         for (int i = 0; ids != null && i < ids.length; i++) {
             ImagePlus img = WindowManager.getImage(ids[i]);
             if (img == null)
                 continue;
-            keys.add(img.getTitle() + " [id: " + ids[i] + "]");
+            ImageSelectionPanel panel = new ImageSelectionPanel(img.getTitle(), ids[i]);
+            panels.add(panel);
+            selectionPanel.add(panel);
         }
-        imageKeys = new String[keys.size()];
-        keys.toArray(imageKeys);
-        selection.setSelectionMode(ListSelectionModel.MULTIPLE_INTERVAL_SELECTION);
-        selection.setListData(imageKeys);
-        if (ids != null)
-            selection.setSelectedIndex(0);
+        images = new ImageSelectionPanel[panels.size()];
+        selectionLayout.setRows(panels.size());
+        panels.toArray(images);
+
+        JScrollPane scrollPane = new JScrollPane(selectionPanel);
+        scrollPane.setHorizontalScrollBarPolicy(JScrollPane.HORIZONTAL_SCROLLBAR_NEVER);
+        scrollPane.setVerticalScrollBarPolicy(JScrollPane.VERTICAL_SCROLLBAR_ALWAYS);
+        scrollPane.setBounds(50, 30, 300, 50);
 
         addComponent(new JLabel("Select the images for the montage:"));
 
-        allSameCheckBox = new JCheckBox();
-        allSameCheckBox.setText("All images show the same area");
-        allSameCheckBox.setSelected(true);
-        addComponent(allSameCheckBox);
+        allSameCheckbox = new JCheckBox();
+        allSameCheckbox.setText("All images show the same area");
+        allSameCheckbox.setSelected(true);
+        addComponent(allSameCheckbox);
 
+        addZProjectionCheckbox = new JCheckBox();
+        addZProjectionCheckbox.setText("Add Z-Projection (Only suitable for fluorescent images)");
+        addComponent(addZProjectionCheckbox);
+
+        constraints.gridwidth = GridBagConstraints.LINE_START;
+        constraints.weightx = 1;
+        JButton setLabelsTitleButton = new JButton("Labels as Title");
+        setLabelsTitleButton.addActionListener(new ActionListener() {
+            @Override
+            public void actionPerformed(ActionEvent actionEvent) {
+                for (ImageSelectionPanel panel : images)
+                    panel.setLabel(panel.getTitle());
+            }
+        });
+        addComponent(setLabelsTitleButton);
+
+        constraints.gridwidth = GridBagConstraints.CENTER;
+        JButton setLabelsNumbersButton = new JButton("Labels as 1,2..N");
+        setLabelsNumbersButton.addActionListener(new ActionListener() {
+            @Override
+            public void actionPerformed(ActionEvent actionEvent) {
+                for (int i = 0; i < images.length; i++)
+                    images[i].setLabel("" + (i + 1));
+            }
+        });
+        addComponent(setLabelsNumbersButton);
+
+        constraints.gridwidth = GridBagConstraints.REMAINDER;
+        JButton setLabelsCharsButton = new JButton("Labels as A,B..Z");
+        setLabelsCharsButton.addActionListener(new ActionListener() {
+            @Override
+            public void actionPerformed(ActionEvent actionEvent) {
+                for (int i = 0; i < images.length; i++)
+                    images[i].setLabel("" + (char) (i + 'A'));
+            }
+        });
+        addComponent(setLabelsCharsButton);
+
+        constraints.weightx = 0;
         constraints.weighty = 1;
-        addComponent(selection);
+        addComponent(scrollPane);
         constraints.weighty = 0;
         addOkAndCancelButtons(ids != null, true);
     }
 
-    private final JList selection;
-    private final String[] imageKeys;
-    private final JCheckBox allSameCheckBox;
+    private final ImageSelectionPanel[] images;
+    private final JCheckBox allSameCheckbox;
+    private final JCheckBox addZProjectionCheckbox;
 
     public boolean getAllImagesSame() {
-        return allSameCheckBox.isSelected();
+        return allSameCheckbox.isSelected();
+    }
+
+    public boolean getAddZProjection() {
+        return addZProjectionCheckbox.isSelected();
     }
 
     public int[] getSelectedIds() {
-        int[] selected = selection.getSelectedIndices();
-        int[] ids = new int[selected.length];
-        for (int i = 0; i < selected.length; i++) {
-            String key = imageKeys[i];
-            key = key.substring(key.lastIndexOf("[id: "));
-            ids[i] = Integer.parseInt(key.substring(5, key.length() - 1));
+        ArrayList<Integer> ids = new ArrayList<Integer>();
+        for (ImageSelectionPanel image : images) {
+            if (image.isSelected())
+                ids.add(image.getId());
         }
-        return ids;
+        int[] result = new int[ids.size()];
+        for (int i = 0; i < ids.size(); i++)
+            result[i] = ids.get(i);
+        return result;
+    }
+
+    public ArrayList<String> getSelectedLabels() {
+        ArrayList<String> labels = new ArrayList<String>();
+        for (ImageSelectionPanel image : images) {
+            if (image.isSelected())
+                labels.add(image.getLabel());
+        }
+        return labels;
     }
 
     @Override

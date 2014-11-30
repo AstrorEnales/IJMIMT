@@ -7,9 +7,9 @@ The automated part of this plugin searches for suitable areas to select and sugg
 
 This plugin is especially useful for multiple images taken by fluorescence microscopy showing different fluorescent filter settings of the same sample.
 
-Work in Progress!
+Installation
 ============
-This plugin is not yet finished but in it's final stages. So please visit again.
+Simply download the "ijmimt_.jar" from this repository and place it inside your ImageJ plugins folder. Make sure you have added the image_edge plugin, too! (See "Dependencies")
 
 Dependencies
 ============

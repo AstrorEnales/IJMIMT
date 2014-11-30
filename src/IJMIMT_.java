@@ -25,34 +25,87 @@ SOFTWARE.
 import ij.IJ;
 import ij.ImagePlus;
 import ij.WindowManager;
+import ij.gui.HistogramWindow;
+import ij.gui.ImageWindow;
+import ij.gui.Roi;
+import ij.gui.TextRoi;
 import ij.plugin.MontageMaker;
 import ij.plugin.PlugIn;
+import ij.plugin.ZProjector;
+import ij.process.ByteProcessor;
+import ij.process.ByteStatistics;
+import ij.process.ImageStatistics;
 
+import javax.swing.*;
 import java.awt.*;
 import java.util.ArrayList;
 
 public class IJMIMT_ implements PlugIn {
     @Override
     public void run(String s) {
-        AllOpenImagesAtStart = new ArrayList<Integer>();
-        int[] ids = WindowManager.getIDList();
-        for (int id : ids)
-            AllOpenImagesAtStart.add(id);
-
+        collectOpenImages();
         SettingsDialog settings = new SettingsDialog();
         settings.showDialog();
         if (settings.getCanceled())
             return;
+        int[] ids = settings.getSelectedIds();
+        if (ids.length <= 0) {
+            IJ.error("At least one image has to be selected for IJMIMT to work!");
+            return;
+        }
 
-        ids = settings.getSelectedIds();
         Rectangle[] areas = new Rectangle[ids.length];
+        Point maxSize = selectAreasAndGetMaxSize(areas, settings, ids);
+        if (maxSize == null)
+            return;
+
+        IJ.setBackgroundColor(255, 255, 255);
+        int sliceCount = areas.length + (settings.getAddZProjection() ? 1 : 0);
+        IJ.newImage(TEMP_TITLE, "RGB", maxSize.x, maxSize.y, sliceCount);
+        ImagePlus stack = WindowManager.getCurrentImage();
+        for (int i = 0; i < areas.length; i++) {
+            Rectangle area = areas[i];
+            IJ.selectWindow(ids[i]);
+            IJ.makeRectangle(area.getX(), area.getY(), area.getWidth(), area.getHeight());
+            IJ.run("Copy");
+            stack.setSlice(i + 1);
+            IJ.selectWindow(TEMP_TITLE);
+            IJ.run("Paste");
+        }
+
+        ArrayList<String> labels = settings.getSelectedLabels();
+        if (settings.getAddZProjection()) {
+            addZProjection(labels, stack, areas);
+        }
+
+        MontageMaker montage = new MontageMaker();
+        int imagesPerRow = sliceCount <= 3 ? sliceCount : (sliceCount / 2) + (sliceCount % 2);
+        int rowCount = sliceCount <= 3 ? 1 : 2;
+        montage.makeMontage(stack, imagesPerRow, rowCount, 1.0, 1, sliceCount, 1, 1, false);
+        stack.changes = false;
+        stack.close();
+
+        writeLabelsToMontage(labels, imagesPerRow, maxSize);
+    }
+
+    private void collectOpenImages() {
+        AllOpenImagesAtStart = new ArrayList<Integer>();
+        int[] ids = WindowManager.getIDList();
+        if (ids != null)
+            for (int id : ids)
+                AllOpenImagesAtStart.add(id);
+    }
+
+    public static ArrayList<Integer> AllOpenImagesAtStart;
+
+    private Point selectAreasAndGetMaxSize(Rectangle[] areas, SettingsDialog settings, int[] ids) {
         int maxWidth = 0;
         int maxHeight = 0;
         if (settings.getAllImagesSame()) {
-            ImageAreaSelector selector = new ImageAreaSelector(ids[0]);
+            ImageAreaSelector selector = new ImageAreaSelector(getIdWithBestHistogram(ids));
             Rectangle area = selector.process();
             if (area == null)
-                return;
+                return null;
             maxWidth = area.width;
             maxHeight = area.height;
             for (int i = 0; i < areas.length; i++)
@@ -62,32 +115,89 @@ public class IJMIMT_ implements PlugIn {
                 ImageAreaSelector selector = new ImageAreaSelector(ids[i]);
                 areas[i] = selector.process();
                 if (areas[i] == null)
-                    return;
+                    return null;
                 if (areas[i].width > maxWidth)
                     maxWidth = areas[i].width;
                 if (areas[i].height > maxHeight)
                     maxHeight = areas[i].height;
             }
         }
-
-        IJ.newImage("ijmimt_stack", "RGB", maxWidth, maxHeight, areas.length);
-        ImagePlus stack = WindowManager.getCurrentImage();
-        for (int i = 0; i < areas.length; i++) {
-            Rectangle area = areas[i];
-            IJ.selectWindow(ids[i]);
-            IJ.makeRectangle(area.getX(), area.getY(), area.getWidth(), area.getHeight());
-            IJ.runMacro("Copy");
-            stack.setSlice(i + 1);
-            IJ.selectWindow("ijmimt_stack");
-            IJ.runMacro("Paste");
-        }
-
-        MontageMaker montage = new MontageMaker();
-        montage.makeMontage(stack, (areas.length / 2) + 1, 2, 1.0, 1, areas.length, 1, 1, true);
-
-        stack.changes = false;
-        stack.close();
+        return new Point(maxWidth, maxHeight);
     }
 
-    public static ArrayList<Integer> AllOpenImagesAtStart;
+    private int getIdWithBestHistogram(int[] ids) {
+        int bestIndex = 0;
+        double bestRange = 0;
+        double bestStdDeviation = 0;
+        double bestMean = 0;
+        for (int i = 0; i < ids.length; i++) {
+            IJ.selectWindow(ids[i]);
+            ImagePlus current = WindowManager.getCurrentImage();
+            ImageStatistics stats = new ByteStatistics(new ByteProcessor(current.getProcessor(), false));
+            HistogramWindow window = new HistogramWindow(TEMP_TITLE, current, stats);
+            double range = stats.max - stats.min;
+            if (i == 0 || (isRangeTolerable(range, bestRange) && isStdDevTolerable(stats.stdDev, bestStdDeviation) &&
+                    isMeanDistTolerable(stats.mean, bestMean))) {
+                bestIndex = i;
+                bestRange = range;
+                bestStdDeviation = stats.stdDev;
+                bestMean = stats.mean;
+            }
+            window.close();
+        }
+        return ids[bestIndex];
+    }
+
+    private static final String TEMP_TITLE = "ijmimt_temp";
+
+    private boolean isRangeTolerable(double newRange, double bestRange) {
+        return newRange >= (bestRange * 0.85);
+    }
+
+    private boolean isStdDevTolerable(double newStdDev, double bestStdDeviation) {
+        return newStdDev >= (bestStdDeviation * 0.85);
+    }
+
+    private boolean isMeanDistTolerable(double newMean, double bestMean) {
+        return Math.abs(128 - newMean) <= (Math.abs(128 - bestMean) * 1.15);
+    }
+
+    private void addZProjection(ArrayList<String> labels, ImagePlus stack, Rectangle[] areas) {
+        ZProjector zProjector = new ZProjector();
+        zProjector.setImage(stack);
+        zProjector.setStartSlice(1);
+        zProjector.setStopSlice(areas.length);
+        zProjector.setMethod(ZProjector.MAX_METHOD);
+        zProjector.doRGBProjection();
+
+        ImagePlus projectionResult = zProjector.getProjection();
+        new ImageWindow(projectionResult);
+        IJ.makeRectangle(0, 0, projectionResult.getWidth(), projectionResult.getHeight());
+        IJ.run("Copy");
+        stack.setSlice(areas.length + 1);
+        IJ.selectWindow(TEMP_TITLE);
+        IJ.run("Paste");
+        projectionResult.changes = false;
+        projectionResult.close();
+        labels.add("z-projection");
+    }
+
+    private void writeLabelsToMontage(ArrayList<String> labels, int imagesPerRow, Point maxSize) {
+        ImagePlus montageResult = WindowManager.getCurrentImage();
+        Font font = new JLabel().getFont();
+        IJ.setForegroundColor(255, 255, 255);
+        int x = 5;
+        int y = maxSize.y - font.getSize() + 5;
+        for (int i = 0; i < labels.size(); i++) {
+            TextRoi roi = new TextRoi(labels.get(i), x, y, font);
+            montageResult.setRoi(roi);
+            IJ.run("Fill");
+            x += maxSize.x;
+            if (i > 0 && ((i + 1) % imagesPerRow) == 0) {
+                x = 5;
+                y += maxSize.y;
+            }
+        }
+        montageResult.setRoi((Roi) null);
+    }
 }

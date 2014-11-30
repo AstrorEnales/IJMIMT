@@ -46,11 +46,11 @@ public class ImageAreaSelector {
     public Rectangle process() {
         IJ.selectWindow(ID);
         ImagePlus original = WindowManager.getCurrentImage();
-        original.copy();
+        IJ.runMacro("Copy");
 
         IJ.newImage("ijmimt_temp", "8-bit", original.getWidth(), original.getHeight(), 1);
         ImagePlus newImage = WindowManager.getCurrentImage();
-        newImage.paste();
+        IJ.runMacro("Paste");
 
         IJ.run("Deriche...", "alpha=1");
 
@@ -91,7 +91,7 @@ public class ImageAreaSelector {
     private Roi[] getParticles(ImagePlus image) {
         ResultsTable table = new ResultsTable();
         RoiManager manager = new RoiManager();
-        ParticleAnalyzer analyzer = new ParticleAnalyzer(ParticleAnalyzer.ADD_TO_MANAGER, 0, table, MIN_PARTICLE_SIZE, MAX_PARTICLE_SIZE);
+        ParticleAnalyzer analyzer = new ParticleAnalyzer(FLAGS, 0, table, MIN_PARTICLE_SIZE, MAX_PARTICLE_SIZE);
         analyzer.analyze(image);
         Roi[] rois = manager.getRoisAsArray();
         Arrays.sort(rois, new Comparator<Roi>() {
@@ -108,6 +108,7 @@ public class ImageAreaSelector {
         return rois;
     }
 
+    private static final int FLAGS = ParticleAnalyzer.ADD_TO_MANAGER | ParticleAnalyzer.EXCLUDE_EDGE_PARTICLES;
     private static final double MIN_PARTICLE_SIZE = 25.0;
     private static final double MAX_PARTICLE_SIZE = Double.POSITIVE_INFINITY;
 
@@ -120,7 +121,7 @@ public class ImageAreaSelector {
         ArrayList<Rectangle> areas = new ArrayList<Rectangle>();
         int count = Math.min(20, rois.length);
         for (int i = 0; i < count; i++) {
-            Rectangle r = rois[rois.length - 2 - i].getBounds();
+            Rectangle r = rois[rois.length - 1 - i].getBounds();
             boolean contained = false;
             for (int i2 = 0; i2 < areas.size() && !contained; i2++)
                 contained = areas.get(i2).contains(r);
