@@ -65,6 +65,11 @@ public class IJMIMT_ implements PlugIn {
         ImagePlus stack = WindowManager.getCurrentImage();
         for (int i = 0; i < areas.length; i++) {
             Rectangle area = areas[i];
+            //String openIds = "";
+            //int[] tmp = WindowManager.getIDList();
+            //for(int j = 0; j < tmp.length; j++)
+            //    openIds += (j > 0 ? ", " : "") + tmp[j];
+            //IJ.log("Processing: " + ids[i] + ", Open IDs: " + openIds);
             IJ.selectWindow(ids[i]);
             IJ.makeRectangle(area.getX(), area.getY(), area.getWidth(), area.getHeight());
             IJ.run("Copy");
@@ -185,13 +190,18 @@ public class IJMIMT_ implements PlugIn {
     private void writeLabelsToMontage(ArrayList<String> labels, int imagesPerRow, Point maxSize) {
         ImagePlus montageResult = WindowManager.getCurrentImage();
         Font font = new JLabel().getFont();
-        IJ.setForegroundColor(255, 255, 255);
         int x = 5;
         int y = maxSize.y - font.getSize() + 5;
         for (int i = 0; i < labels.size(); i++) {
-            TextRoi roi = new TextRoi(labels.get(i), x, y, font);
+            TextRoi roi = new TextRoi(labels.get(i), x + 1, y + 1, font);
             montageResult.setRoi(roi);
+            IJ.setForegroundColor(0, 0, 0);
             IJ.run("Fill");
+            roi = new TextRoi(labels.get(i), x, y, font);
+            montageResult.setRoi(roi);
+            IJ.setForegroundColor(255, 255, 255);
+            IJ.run("Fill");
+
             x += maxSize.x;
             if (i > 0 && ((i + 1) % imagesPerRow) == 0) {
                 x = 5;

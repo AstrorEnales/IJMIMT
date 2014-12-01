@@ -38,7 +38,7 @@ import java.util.ArrayList;
 
 public final class AreaSelectionDialog extends BaseDialog implements ListSelectionListener {
     public AreaSelectionDialog(ArrayList<Rectangle> areas) {
-        super("IJMIMT (2/3)");
+        super("IJMIMT");
         this.areas = areas;
         setSize(200, 400);
 
@@ -121,9 +121,9 @@ public final class AreaSelectionDialog extends BaseDialog implements ListSelecti
 
     @Override
     protected void cleanupAndClose() {
+        super.cleanupAndClose();
         currentImage.getOverlay().clear();
         currentImage.setHideOverlay(true);
-        super.cleanupAndClose();
     }
 
     public Rectangle getResult() {

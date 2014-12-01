@@ -88,6 +88,7 @@ public abstract class BaseDialog extends JDialog {
     private boolean canceled;
 
     public void showDialog() {
+        canceled = false;
         setVisible(true);
     }
 }

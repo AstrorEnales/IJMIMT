@@ -35,7 +35,7 @@ import java.util.ArrayList;
 
 public class SettingsDialog extends BaseDialog implements ListSelectionListener {
     public SettingsDialog() {
-        super("IJMIMT (1/3)");
+        super("IJMIMT");
         setSize(400, 400);
 
         JPanel selectionPanel = new JPanel();

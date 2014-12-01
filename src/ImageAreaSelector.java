@@ -46,11 +46,11 @@ public class ImageAreaSelector {
     public Rectangle process() {
         IJ.selectWindow(ID);
         ImagePlus original = WindowManager.getCurrentImage();
-        IJ.runMacro("Copy");
+        IJ.run("Copy");
 
         IJ.newImage("ijmimt_temp", "8-bit", original.getWidth(), original.getHeight(), 1);
         ImagePlus newImage = WindowManager.getCurrentImage();
-        IJ.runMacro("Paste");
+        IJ.run("Paste");
 
         IJ.run("Deriche...", "alpha=1");
 
